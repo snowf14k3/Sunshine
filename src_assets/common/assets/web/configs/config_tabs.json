@@ -44,6 +44,7 @@
       "install_steam_audio_drivers": "enabled",
       "adapter_name": "",
       "output_name": "",
+      "manual_rotation": "auto",
       "dd_configuration_option": "disabled",
       "dd_resolution_option": "auto",
       "dd_manual_resolution": "",

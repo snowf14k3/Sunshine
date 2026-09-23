@@ -9,6 +9,7 @@
 
 // local includes
 #include "graphics.h"
+#include "src/config.h"
 #include "src/file_handler.h"
 #include "src/logging.h"
 #include "src/video.h"
@@ -1087,15 +1088,25 @@ namespace egl {
   }
 
   /**
+   * @brief Get the extra output rotation requested for the active KMS capture.
+   *
+   * @return Rotation in degrees, or zero when automatic orientation is selected.
+   */
+  int active_manual_rotation() {
+    return platf::using_kms_capture() && config::video.manual_rotation > 0 ? config::video.manual_rotation : 0;
+  }
+
+  /**
    * @brief Configure the EGL/OpenGL scaling and colorspace conversion pipeline.
    *
    * @param sws Software-scaling pipeline to configure.
    * @param color_p Color p.
    * @param tex Texture resource used by the converter.
    * @param is_yuv444 Is YUV444.
+   * @param rotation Clockwise rotation applied when converting the source image.
    * @return 0 when shaders, framebuffers, and color uniforms are ready; nonzero on failure.
    */
-  int configure_sws_pipeline(sws_t &sws, const video::color_t *color_p, gl::tex_t &&tex, bool is_yuv444) {
+  int configure_sws_pipeline(sws_t &sws, const video::color_t *color_p, gl::tex_t &&tex, bool is_yuv444, int rotation) {
     std::array<std::pair<const char *, std::string_view>, 5> members {{
       std::make_pair("color_vec_y", util::view(color_p->color_vec_y)),
       std::make_pair("color_vec_u", util::view(color_p->color_vec_u)),
@@ -1120,7 +1131,13 @@ namespace egl {
 
     for (int i = 0; i < programCount; i++) {
       sws.program[i].bind(sws.color_matrix);
+      auto location = gl::ctx.GetUniformLocation(sws.program[i].handle(), "rotation");
+      if (location >= 0) {
+        gl::ctx.Uniform1i(location, rotation);
+      }
     }
+
+    // The cursor is composed in source coordinates, before output rotation.
 
     gl::ctx.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -1133,10 +1150,14 @@ namespace egl {
 
     sws.serial = std::numeric_limits<std::uint64_t>::max();
 
+    const int rotation = active_manual_rotation();
+    const int effective_in_width = rotation == 90 || rotation == 270 ? in_height : in_width;
+    const int effective_in_height = rotation == 90 || rotation == 270 ? in_width : in_height;
+
     // Ensure aspect ratio is maintained
-    auto scalar = std::fminf(out_width / (float) in_width, out_height / (float) in_height);
-    auto out_width_f = in_width * scalar;
-    auto out_height_f = in_height * scalar;
+    auto scalar = std::fminf(out_width / (float) effective_in_width, out_height / (float) effective_in_height);
+    auto out_width_f = effective_in_width * scalar;
+    auto out_height_f = effective_in_height * scalar;
 
     // result is always positive
     auto offsetX_f = (out_width - out_width_f) / 2;
@@ -1226,7 +1247,7 @@ namespace egl {
 
     auto color_p = video::color_vectors_from_colorspace({video::colorspace_e::rec601, false, 8}, true);
 
-    int pipeline = configure_sws_pipeline(sws, color_p, std::move(tex), false);
+    int pipeline = configure_sws_pipeline(sws, color_p, std::move(tex), false, rotation);
     if (pipeline < 0) {
       return std::nullopt;
     }
@@ -1239,14 +1260,18 @@ namespace egl {
 
     sws.serial = std::numeric_limits<std::uint64_t>::max();
 
+    const int rotation = active_manual_rotation();
+    const int effective_in_width = rotation == 90 || rotation == 270 ? in_height : in_width;
+    const int effective_in_height = rotation == 90 || rotation == 270 ? in_width : in_height;
+
     // Ensure aspect ratio is maintained
-    auto scalar = std::fminf(out_width / (float) in_width, out_height / (float) in_height);
-    auto out_width_f = in_width * scalar;
-    auto out_height_f = in_height * scalar;
+    auto scalar = std::fminf(out_width / (float) effective_in_width, out_height / (float) effective_in_height);
+    auto out_width_f = effective_in_width * scalar;
+    auto out_height_f = effective_in_height * scalar;
 
     // result is always positive
-    auto offsetX_f = out_width - out_width_f;
-    auto offsetY_f = out_height - out_height_f;
+    auto offsetX_f = rotation ? (out_width - out_width_f) / 2 : out_width - out_width_f;
+    auto offsetY_f = rotation ? (out_height - out_height_f) / 2 : out_height - out_height_f;
 
     sws.out_width = out_width_f;
     sws.out_height = out_height_f;
@@ -1331,7 +1356,7 @@ namespace egl {
 
     auto color_p = video::color_vectors_from_colorspace({video::colorspace_e::rec709, true, 8}, false);
 
-    int pipeline = configure_sws_pipeline(sws, color_p, std::move(tex), true);
+    int pipeline = configure_sws_pipeline(sws, color_p, std::move(tex), true, rotation);
     if (pipeline < 0) {
       return std::nullopt;
     }

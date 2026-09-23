@@ -1159,6 +1159,14 @@ namespace platf {
 
   static std::bitset<source::MAX_FLAGS> sources;
 
+  bool using_kms_capture() {
+#ifdef SUNSHINE_BUILD_DRM
+    return sources[source::KMS];
+#else
+    return false;
+#endif
+  }
+
 #ifdef SUNSHINE_BUILD_CUDA
   std::vector<std::string> nvfbc_display_names();
   std::shared_ptr<display_t> nvfbc_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);

@@ -7,6 +7,7 @@
 #include "../tests_common.h"
 
 // standard includes
+#include <array>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -43,6 +44,33 @@ INSTANTIATE_TEST_SUITE_P(
     NvencPresetNameParam {7, "p7"sv}
   )
 );
+
+TEST(ConfigManualRotationTest, AcceptsOnlySupportedKmsAngles) {
+  const int previous_rotation = config::video.manual_rotation;
+  config::video.manual_rotation = -1;
+  config::apply_config_for_test("");
+  EXPECT_EQ(config::video.manual_rotation, -1);
+
+  constexpr std::array cases {
+    std::pair {"0", 0},
+    std::pair {"90", 90},
+    std::pair {"auto", -1},
+    std::pair {"180", 180},
+    std::pair {"270", 270},
+    std::pair {"45", -1},
+    std::pair {"360", -1},
+    std::pair {"-90", -1},
+    std::pair {"abc", -1},
+  };
+
+  for (const auto &[setting, expected] : cases) {
+    SCOPED_TRACE(setting);
+    config::apply_config_for_test(std::string {"manual_rotation = "} + setting);
+    EXPECT_EQ(config::video.manual_rotation, expected);
+  }
+
+  config::video.manual_rotation = previous_rotation;
+}
 
 namespace {
 

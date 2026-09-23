@@ -2235,6 +2235,31 @@ supported on the current platform.
     </tr>
 </table>
 
+### manual_rotation
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>Apply an extra clockwise rotation to a KMS capture when the panel orientation is reported incorrectly.
+            Automatic preserves the existing orientation. This setting applies to the Linux KMS OpenGL conversion path;
+            it does not change the physical display orientation or remap input coordinates.</td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>auto</td>
+    </tr>
+    <tr>
+        <td>Choices</td>
+        <td>auto, 0, 90, 180, 270</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td>@code{}
+            manual_rotation = 90
+            @endcode</td>
+    </tr>
+</table>
+
 ### encoder
 
 <table>

@@ -794,6 +794,8 @@ namespace config {
       {}  // wa
     },  // display_device
 
+    -1,  // manual_rotation (automatic)
+
     0,  // max_bitrate
     0  // minimum_fps_target (0 = framerate)
   };
@@ -1718,6 +1720,21 @@ namespace config {
       int value = 0;
       int_between_f(vars, "dd_wa_hdr_toggle_delay", value, {0, 3000});
       video.dd.wa.hdr_toggle_delay = std::chrono::milliseconds {value};
+    }
+
+    {
+      std::string rotation;
+      string_f(vars, "manual_rotation", rotation);
+      if (!rotation.empty()) {
+        if (rotation == "0" || rotation == "90" || rotation == "180" || rotation == "270") {
+          video.manual_rotation = parse_config_integer(rotation);
+        } else {
+          video.manual_rotation = -1;
+          if (rotation != "auto") {
+            BOOST_LOG(warning) << "Invalid manual_rotation value; using automatic orientation.";
+          }
+        }
+      }
     }
 
     int_f(vars, "max_bitrate", video.max_bitrate);

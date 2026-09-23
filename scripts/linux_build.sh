@@ -19,6 +19,7 @@ cuda_system_package=0
 cuda_system_package_name=""
 force_cuda_runfile=0
 num_processors=$(nproc)
+build_dir_name="build"
 publisher_name="Third Party Publisher"
 publisher_website=""
 publisher_issue_url="https://app.lizardbyte.dev/support"
@@ -188,6 +189,7 @@ Options:
   --cuda-system-package=*  The CUDA package to install when system CUDA is enabled.
                            Default for Ubuntu 26.04 and 26.10 is cuda-toolkit-13-1.
   --num-processors         The number of processors to use for compilation. Default is the value of 'nproc'.
+  --build-dir=*            Build directory name, relative to the repository root.
   --publisher-name         The name of the publisher (not developer) of the application.
   --publisher-website      The URL of the publisher's website.
   --publisher-issue-url    The URL of the publisher's support site or issue tracker.
@@ -235,6 +237,13 @@ while getopts ":hs-:" opt; do
           ;;
         num-processors=*)
           num_processors="${OPTARG#*=}"
+          ;;
+        build-dir=*)
+          build_dir_name="${OPTARG#*=}"
+          if [[ ! "$build_dir_name" =~ ^cmake-build-[A-Za-z0-9._-]+$ ]]; then
+            echo "Build directory must start with cmake-build- and contain only letters, digits, dots, underscores, or hyphens." >&2
+            exit 1
+          fi
           ;;
         publisher-name=*)
           publisher_name="${OPTARG#*=}"
@@ -672,9 +681,9 @@ function run_step_deps() {
         wget "${doxygen_download_args[@]}"  # NOSONAR(shell:S6506)
         tar -xzf "${DOXYGEN}.tar.gz"
         cd "${DOXYGEN}-${doxygen_min}"
-        cmake -DCMAKE_BUILD_TYPE=Release -G="Ninja" -B="build" -S="."
-        ninja -C "build" -j"${num_processors}"
-        ${sudo_cmd} ninja -C "build" install
+        cmake -DCMAKE_BUILD_TYPE=Release -G="Ninja" -B="cmake-build-doxygen" -S="."
+        ninja -C "cmake-build-doxygen" -j"${num_processors}"
+        ${sudo_cmd} ninja -C "cmake-build-doxygen" install
       popd
     else
       echo "${DOXYGEN} version not in range, skipping docs"
@@ -727,7 +736,7 @@ function run_step_cmake() {
 
   # prepare CMAKE args
   cmake_args=(
-    "-B=build"
+    "-B=${build_dir_name}"
     "-G=Ninja"
     "-S=."
     "-DBUILD_WERROR=ON"
@@ -774,7 +783,7 @@ function run_step_cmake() {
   fi
 
   # Cmake stuff here
-  mkdir -p "build"
+  mkdir -p "$build_dir_name"
   echo "cmake args:"
   echo "${cmake_args[@]}"
   cmake "${cmake_args[@]}"
@@ -785,11 +794,11 @@ function run_step_validation() {
   echo "Running step: Validation"
 
   # Run appstream validation, etc.
-  appstreamcli validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-  appstream-util validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-  desktop-file-validate "build/dev.lizardbyte.app.Sunshine.desktop"
+  appstreamcli validate "${build_dir_name}/dev.lizardbyte.app.Sunshine.metainfo.xml"
+  appstream-util validate "${build_dir_name}/dev.lizardbyte.app.Sunshine.metainfo.xml"
+  desktop-file-validate "${build_dir_name}/dev.lizardbyte.app.Sunshine.desktop"
   if [[ "$appimage_build" == 0 ]]; then
-    desktop-file-validate "build/dev.lizardbyte.app.Sunshine.terminal.desktop"
+    desktop-file-validate "${build_dir_name}/dev.lizardbyte.app.Sunshine.terminal.desktop"
   fi
   return 0
 }
@@ -801,7 +810,7 @@ function run_step_build() {
   setup_nvm_environment
 
   # Build the project
-  ninja -C "build"
+  ninja -C "$build_dir_name"
   return 0
 }
 
@@ -811,9 +820,9 @@ function run_step_package() {
   # Create the package
   if [[ "$skip_package" == 0 ]]; then
     if [[ "$distro" == "$DISTRO_DEBIAN" ]] || [[ "$distro" == "$DISTRO_UBUNTU" ]]; then
-      cpack -G DEB --config ./build/CPackConfig.cmake
+      cpack -G DEB --config "./${build_dir_name}/CPackConfig.cmake"
     elif [[ "$distro" == "$DISTRO_FEDORA" ]]; then
-      cpack -G RPM --config ./build/CPackConfig.cmake
+      cpack -G RPM --config "./${build_dir_name}/CPackConfig.cmake"
     fi
   fi
   return 0
@@ -973,7 +982,7 @@ fi
 
 # get directory of this script
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-build_dir=$(readlink -f "$script_dir/../build")
+build_dir=$(readlink -f "$script_dir/../$build_dir_name")
 echo "Script Directory: $script_dir"
 echo "Build Directory: $build_dir"
 mkdir -p "$build_dir"

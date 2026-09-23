@@ -1,0 +1,61 @@
+---
+name: KMS Debian 13 ARM64 DEB
+
+permissions: {}
+
+on:
+  push:
+    branches:
+      - codex/kms-rotation
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Debian 13 ARM64
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:trixie
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Install checkout prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends bash ca-certificates git sudo
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Build and package with the project script
+        env:
+          SUNSHINE_COMPILE_DOXYGEN: 'false'
+        run: |
+          bash scripts/linux_build.sh \
+            --build-dir=cmake-build-debian13-arm64 \
+            --publisher-name="${GITHUB_REPOSITORY_OWNER}" \
+            --skip-cuda
+
+      - name: Validate rotation shaders and config parsing
+        run: |
+          glslangValidator -S vert src_assets/linux/assets/shaders/opengl/Scene.vert
+          glslangValidator -S vert src_assets/linux/assets/shaders/opengl/ConvertUV.vert
+          glslangValidator -S frag src_assets/linux/assets/shaders/opengl/ConvertUV.frag
+          cmake-build-debian13-arm64/tests/test_sunshine \
+            --gtest_filter='ConfigManualRotationTest.*'
+
+      - name: Verify Debian package architecture
+        run: |
+          for package in ./*.deb; do
+            test -f "$package"
+            test "$(dpkg-deb -f "$package" Architecture)" = arm64
+          done
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: sunshine-debian13-arm64-kms
+          path: ./*.deb
+          if-no-files-found: error

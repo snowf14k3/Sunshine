@@ -81,6 +81,13 @@ namespace platf {
   int open_drm_card_fd(const std::filesystem::path &path, int flags = O_RDWR);
 
   /**
+   * @brief Report whether KMS is the selected Linux capture backend.
+   *
+   * @return True when KMS capture is active.
+   */
+  bool using_kms_capture();
+
+  /**
    * @brief Generic frame pacing logic for Linux capture methods.
    *
    * Advances the frame pacing timeline and re-anchors it if the capture thread falls behind.
