@@ -52,13 +52,29 @@ jobs:
           log_tail=${log_tail//$'\n'/'%0A'}
           echo "::error title=Debian ARM64 build failure::$log_tail"
 
-      - name: Validate rotation shaders and config parsing
+      - name: Validate rotation shaders
         run: |
           glslangValidator -S vert src_assets/linux/assets/shaders/opengl/Scene.vert
           glslangValidator -S vert src_assets/linux/assets/shaders/opengl/ConvertUV.vert
           glslangValidator -S frag src_assets/linux/assets/shaders/opengl/ConvertUV.frag
+
+      - name: Test rotation configuration
+        id: config_test
+        shell: bash
+        run: |
+          set -o pipefail
           cmake-build-debian13-arm64/tests/test_sunshine \
-            --gtest_filter='ConfigManualRotationTest.*'
+            --gtest_filter='ConfigManualRotationTest.*' 2>&1 | tee cmake-build-debian13-arm64-test.log
+
+      - name: Show test failure in run annotations
+        if: failure() && steps.config_test.outcome == 'failure'
+        shell: bash
+        run: |
+          log_tail=$(tail -n 50 cmake-build-debian13-arm64-test.log)
+          log_tail=${log_tail//'%'/'%25'}
+          log_tail=${log_tail//$'\r'/'%0D'}
+          log_tail=${log_tail//$'\n'/'%0A'}
+          echo "::error title=Rotation config test failure::$log_tail"
 
       - name: Verify Debian package architecture
         run: |
