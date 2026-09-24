@@ -45,9 +45,35 @@ INSTANTIATE_TEST_SUITE_P(
   )
 );
 
-TEST(ConfigManualRotationTest, AcceptsOnlySupportedKmsAngles) {
-  const int previous_rotation = config::video.manual_rotation;
-  config::video.manual_rotation = -1;
+/**
+ * @brief Preserve global configuration while testing manual KMS rotation.
+ */
+class ConfigManualRotationTest: public testing::Test {
+protected:
+  /**
+   * @brief Point the applications setting at an existing test file.
+   */
+  void SetUp() override {
+    previous_rotation = config::video.manual_rotation;
+    previous_file_apps = config::stream.file_apps;
+    config::video.manual_rotation = -1;
+    config::stream.file_apps = SUNSHINE_SOURCE_DIR "/tests/unit/test_config.cpp";
+  }
+
+  /**
+   * @brief Restore global configuration after the test.
+   */
+  void TearDown() override {
+    config::video.manual_rotation = previous_rotation;
+    config::stream.file_apps = std::move(previous_file_apps);
+  }
+
+private:
+  int previous_rotation {};  ///< Manual rotation value active before the test.
+  std::string previous_file_apps;  ///< Applications path active before the test.
+};
+
+TEST_F(ConfigManualRotationTest, AcceptsOnlySupportedKmsAngles) {
   config::apply_config_for_test("");
   EXPECT_EQ(config::video.manual_rotation, -1);
 
@@ -68,8 +94,6 @@ TEST(ConfigManualRotationTest, AcceptsOnlySupportedKmsAngles) {
     config::apply_config_for_test(std::string {"manual_rotation = "} + setting);
     EXPECT_EQ(config::video.manual_rotation, expected);
   }
-
-  config::video.manual_rotation = previous_rotation;
 }
 
 namespace {
