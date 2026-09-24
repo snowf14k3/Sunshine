@@ -33,6 +33,10 @@ jobs:
       - name: Build and package with the project script
         id: build
         env:
+          BRANCH: codex/kms-rotation
+          BUILD_VERSION: '2026.924.1'
+          COMMIT: ${{ github.sha }}
+          DEBIAN_PACKAGE_RELEASE: '1+debiantrixie+kms1'
           SUNSHINE_COMPILE_DOXYGEN: 'false'
         shell: bash
         run: |
