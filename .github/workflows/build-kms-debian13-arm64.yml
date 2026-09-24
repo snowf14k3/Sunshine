@@ -77,15 +77,20 @@ jobs:
           echo "::error title=Rotation config test failure::$log_tail"
 
       - name: Verify Debian package architecture
+        shell: bash
         run: |
-          for package in ./*.deb; do
-            test -f "$package"
-            test "$(dpkg-deb -f "$package" Architecture)" = arm64
+          shopt -s nullglob
+          packages=(cmake-build-debian13-arm64/cpack_artifacts/*.deb)
+          test "${#packages[@]}" -gt 0
+          for package in "${packages[@]}"; do
+            architecture=$(dpkg-deb -f "$package" Architecture)
+            echo "$package: $architecture"
+            test "$architecture" = arm64
           done
 
       - name: Upload Debian package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: sunshine-debian13-arm64-kms
-          path: ./*.deb
+          path: cmake-build-debian13-arm64/cpack_artifacts/*.deb
           if-no-files-found: error
